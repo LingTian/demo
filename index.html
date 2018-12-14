@@ -134,7 +134,7 @@
                                               <!--此处可以参考web3在github上的文档http://github.com/ethereum/web3.js-->
                                               <!--也就是web3.js提供的对于智能合约方法的操作与交互-->
                                               <!--getInfo方法是对上面的id="info"设置，result是从智能合约获得的结果-->
-                                              info.zombies(function(error,result){
+                                              info.zombies(0,function(error,result){
                                                            if(!error){
                                                            $("#info").html(result[0]+'('+result[1]+')years old');
                                                            }
@@ -143,7 +143,7 @@
                                                            $("#button").click(function(){
                                                                               var name = $("#name").val();
                                                                               var age = $("#age").val();
-                                                                              info.setInfo(name,age,function(error,result){
+                                                                              info.createRandomZombie(name,function(error,result){
                                                                                            if(!error){
                                                                                            console.log("ok");
                                                                                            }
