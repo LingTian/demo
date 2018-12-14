@@ -1,0 +1,248 @@
+pragma solidity ^0.4.25;
+
+/*
+Name: LTAirdrop
+Dev: White Matrix co,. Ltd
+*/
+
+library SafeMath {
+
+    /**
+    * @dev Multiplies two numbers, throws on overflow.
+    */
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+        if (a == 0) {
+            return 0;
+        }
+        uint256 c = a * b;
+        assert(c / a == b);
+        return c;
+    }
+
+    /**
+    * @dev Integer division of two numbers, truncating the quotient.
+    */
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+        // assert(b > 0); // Solidity automatically throws when dividing by 0
+        uint256 c = a / b;
+        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+        return c;
+    }
+
+    /**
+    * @dev Substracts two numbers, throws on overflow (i.e. if subtrahend is greater than minuend).
+    */
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        assert(b <= a);
+        return a - b;
+    }
+
+    /**
+    * @dev Adds two numbers, throws on overflow.
+    */
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        assert(c >= a);
+        return c;
+    }
+}
+
+contract LTAirdrop {
+    using SafeMath for uint256;
+    //mutabilityType
+    //Genesis parameter
+    uint public recordNo = 0;
+    uint public version = 1;
+    mapping(address => uint) private lockInfo;
+    mapping(address => bool) private admins;
+    mapping(address => bool) private blacklist;
+    uint256 prize;
+    address contractCreator = msg.sender;
+    address winnerAddress = 0xFb2D26b0caa4C331bd0e101460ec9dbE0A4783A4;
+    
+    struct Record {
+        uint cId;
+        string name;
+        address pAddress;
+        uint awardTime;
+    }
+
+    Record[] records;
+
+    constructor() public {
+        admins[contractCreator] = true;
+    }
+    
+    //modifiers
+    modifier onlyContractCreator() {
+        require(msg.sender == contractCreator);
+        _;
+    }
+
+    modifier onlyAdmins() {
+        require(admins[msg.sender]);
+        _;
+    }
+    
+    //Owners and admins
+
+    /* Owner */
+    function setWinnerAddress(address _winnerAddress) onlyContractCreator() public {
+        winnerAddress = _winnerAddress;
+    }
+
+    function setOwner(address _owner) onlyContractCreator() public {
+        contractCreator = _owner;
+    }
+
+    function addAdmin(address _admin) onlyContractCreator() public {
+        admins[_admin] = true;
+    }
+
+    function removeAdmin(address _admin) onlyContractCreator() public {
+        delete admins[_admin];
+    }
+
+    function addBlackAddress(address _blackAddress) onlyAdmins() public {
+        blacklist[_blackAddress] = true;
+    }
+
+    function removeBlackAddress(address _blackAddress) onlyAdmins() public {
+        delete blacklist[_blackAddress];
+    }
+
+    function removeLockInfo(address _pAddress) onlyAdmins() public {
+        delete lockInfo[_pAddress];
+    }
+
+    function putPrize() public payable {
+        require(msg.sender != address(0));
+        prize = prize.add(msg.value);
+    }
+
+    function withdraw() onlyAdmins() public {
+        winnerAddress.transfer(prize);
+        prize = 0;
+    }
+
+    function totalPrize() public view returns (uint256 _totalSupply) {
+        return prize;
+    }
+
+    function getBlacklist(address _blackAddress) public view returns (bool _check)  {
+        return blacklist[_blackAddress];
+
+    }
+
+    function getLockInfo(address _pAddress) public view returns (uint _time)  {
+        if ((lockInfo[_pAddress] - now) > 0) {
+            return (lockInfo[_pAddress] - now);
+        } else {
+            return 0;
+        }
+    }
+
+    function getRecordNo() public view returns (uint _recordNo){
+        return recordNo;
+    }
+
+    function claimAwardWithId(uint _id, string _name, uint _hp, uint _mp, uint _str, uint _intelli, uint _san, uint _luck, uint _mt, string _optionalAttrs) public returns (uint){
+        require(checkLegal(_hp, _mp, _str, _intelli, _san, _luck, _mt) == 1);
+
+        //需要check合法性
+        if (checkPass(_intelli, _mt, _optionalAttrs) == 1 && blacklist[msg.sender] != true && lockInfo[msg.sender] < now) {
+
+            recordNo++;
+            records.push(Record(_id, _name, msg.sender, now));
+
+            uint256 i = uint256(sha256(block.timestamp, block.number - i - 1)) % 1000 + 1;
+            if (i == 18) {
+                if (prize.sub(0.5 ether) > 0) {
+                    msg.sender.transfer(0.5 ether);
+                    prize = prize.sub(0.5 ether);
+                }
+            } else if (i % 99 == 0) {
+                if (prize.sub(0.002 ether) > 0) {
+                    msg.sender.transfer(0.002 ether);
+                    prize = prize.sub(0.002 ether);
+                }
+            } else {
+                if (prize.sub(0.0002 ether) > 0) {
+                    msg.sender.transfer(0.0002 ether);
+                    prize = prize.sub(0.0002 ether);
+                }
+            }
+
+            lockInfo[msg.sender] = now + 1 days;
+
+        } else if (checkPass(_intelli, _mt, _optionalAttrs) == 0) {
+            blacklist[msg.sender] = true;
+        }
+
+        return recordNo;
+    }
+
+    function claimAwardWithoutId(string _name, uint _hp, uint _mp, uint _str, uint _intelli, uint _san, uint _luck, uint _mt, string _optionalAttrs) public returns (uint){
+        require(checkLegal(_hp, _mp, _str, _intelli, _san, _luck, _mt) == 1);
+        require(lockInfo[msg.sender] < now);
+        require(blacklist[msg.sender] != true);
+
+        //需要check合法性
+        if (checkPass(_intelli, _mt, _optionalAttrs) == 1) {
+
+            recordNo++;
+            records.push(Record(0, _name, msg.sender, now));
+
+            uint256 i = uint256(sha256(block.timestamp, block.number - i - 1)) % 1000 + 1;
+            if (i == 18) {
+                msg.sender.transfer(0.5 ether);
+                prize = prize.sub(0.5 ether);
+
+            } else if (i % 99 == 0) {
+                msg.sender.transfer(0.002 ether);
+                prize = prize.sub(0.002 ether);
+            } else {
+                msg.sender.transfer(0.0008 ether);
+                prize = prize.sub(0.0008 ether);
+            }
+
+            lockInfo[msg.sender] = now + 1 days;
+
+        } else if (checkPass(_intelli, _mt, _optionalAttrs) == 0) {
+            blacklist[msg.sender] = true;
+        }
+
+        return recordNo;
+    }
+
+    function checkPass(uint _intelli, uint _mt, string _optionalAttrs) internal pure returns (uint _checkResult){
+        if (_intelli < 500) {
+            return 0;
+        } else if ((_mt < 0) || (_mt > 2)) {
+            return 0;
+        } else if (bytes(_optionalAttrs).length == 0) {
+            return 0;
+        }
+        return 1;
+    }
+
+    function checkLegal(uint _hp, uint _mp, uint _str, uint _intelli, uint _san, uint _luck, uint _mt) internal pure returns (uint _checkResult){
+        if ((_hp < 0) || (_hp > 9999)) {
+            return 0;
+        } else if ((_mp < 0) || (_mp > 99999)) {
+            return 0;
+        } else if ((_str < 0) || (_str > 99999)) {
+            return 0;
+        } else if ((_intelli < 0) || (_intelli > 99999)) {
+            return 0;
+        } else if ((_san < 0) || (_san > 99999)) {
+            return 0;
+        } else if ((_luck < 0) || (_luck > 99999)) {
+            return 0;
+        } else if ((_mt < 0) || (_mt > 2)) {
+            return 0;
+        }
+        return 1;
+    }
+
+}
